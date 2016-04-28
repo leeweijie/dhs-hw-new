@@ -60,6 +60,19 @@ def get_subject_combination(user):
     else:
         return False
 
+
+def get_user_info(user):
+    email = user.email()
+    user_info = models.UserInfo.query(ancestor=email).fetch()[0]
+    if user_info.user_class:
+        return {'user_class', user_info.user_class,
+                'groups', user_info.groups,
+                'subject_combination', user_info.subject_combination}
+    else:
+        return {'groups', user_info.groups,
+                'subject_combination', user_info.subject_combination}
+
+
 def check_expired(task):
     if task.due_date > datetime.date.today():
         task.key.delete()
