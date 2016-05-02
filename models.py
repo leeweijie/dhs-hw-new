@@ -3,21 +3,16 @@ from google.appengine.ext import ndb
 
 
 class Task(ndb.Model):  # Class is the ancestor
-    name = ndb.StringProperty(required=True)
-    user = ndb.UserProperty(auto_current_user_add=True, indexed=True, required=True)
+    extra_title = ndb.StringProperty()
+    user = ndb.UserProperty(indexed=True, required=True)
     time_added = ndb.DateTimeProperty(auto_now_add=True, required=True)
-
+    type = ndb.StringProperty(choices=constants.TASK_TYPE, required=True)
     subject = ndb.StringProperty(choices=constants.ALL_SUBJECTS, required=True)
-    is_private = ndb.BooleanProperty(default=False, required=True)
     due_date = ndb.DateProperty()
-    time_needed = ndb.IntegerProperty(choices=constants.TIME_NEEDED_RANGE)
-    priority = ndb.IntegerProperty(choices=constants.PRIORITY_RANGE)
-
-    user_status = ndb.StructuredProperty(UserStatus, repeated=True)
 
 
-class UserStatus(ndb.Model):
-    user = ndb.UserProperty(auto_current_user_add=True, indexed=True, required=True)
+class UserStatus(ndb.Model):  # Ancestor is the task key
+    user = ndb.UserProperty(indexed=True, required=True)
     task_done = ndb.BooleanProperty(required=True)
 
 
@@ -26,8 +21,8 @@ class SubjectCombination(ndb.Model):
     subject_combination = ndb.StringProperty(choices=constants.ALL_SUBJECTS, repeated=True)
 
 
+# User info added by admin
 class UserInfo(ndb.Model):  # Ancestor is user's email. Form: ('email', email)
-    type = ndb.IntegerProperty(constants.USER_TYPE.items(), required=True)
-    user_class = ndb.StringProperty()  # If user is  student
+    type = ndb.IntegerProperty(constants.USER_TYPE, required=True)  # Whether user is a student or teacher
     groups = ndb.StringProperty(repeated=True)
     subject_combination = ndb.StructuredProperty(SubjectCombination)

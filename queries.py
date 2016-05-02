@@ -1,20 +1,26 @@
 import models
 import datetime
+import constants
 from google.appengine.ext import ndb
 
 
-# Get lists of relevant tasks
-def get_tasks(user, user_class, sort_type, task_done,
-              subject_combination, reverse=False):
-    query = models.Task.query(
-        models.Task.subject.IN(subject_combination),
-        ndb.OR(not models.Task.is_private, models.Task.user == user),
-        ancestor=user_class)
+# Get lists of relevant tasks from a group
+def get_tasks(group, user, task_done):
 
-    if reverse:
-        query.order(-sort_type)
-    else:
-        query.order(sort_type)
+    user_info = get_user_info(user)
+
+    if group not in user_info.groups:  # Check if user in the group
+        return False
+
+    if user_info.type == constants.STUDENT:
+        query = models.Task.query(
+            models.Task.subject.IN(user_info.subject_combination),
+            ancestor=ndb.Key('group', group))
+    else:  # Teacher
+        query = models.Task.query(
+            ancestor=ndb.Key('group', group))
+
+    query.order(models.Task.time_added)
 
     tasks = query.fetch()
     to_remove = []
@@ -32,13 +38,16 @@ def get_tasks(user, user_class, sort_type, task_done,
 
 
 # Use this to get or edit task. Checks if user has authorised access to task
-def get_task(urlid, user, user_class):
+def get_task(urlid, user):
     task = ndb.Key(urlid=urlid).get()
-    if task.key.parent()[1] != user_class:  # Check second value of parent key tuple as equal to user's class
+
+    user_info = get_user_info(user)
+
+    # Check if user in the task's group
+    if task.parent()[1] not in user_info.groups:
         return False
-    elif task.is_private and task.user != user:  # Check if task is yours if its private
-        return False
-    elif check_expired(task):  # Check if task is expired. If it is, delete it
+    # Check if task is expired. If it is, delete it
+    elif check_expired(task):
         return False
     else:
         return task
@@ -47,30 +56,16 @@ def get_task(urlid, user, user_class):
 def delete_task(urlid, user, user_class):
     task = get_task(urlid, user, user_class)
     if task is not False:  # If user is authorised to delete the task
-        task.key.delete()
-        return True
-    return False
-
-
-def get_subject_combination(user):
-    subject_combination = models.SubjectCombination.query(
-        models.SubjectCombination.user == user).fetch()
-    if subject_combination:
-        return subject_combination[0]  # gets the only element from the list
-    else:
-        return False
+        try:
+            task.key.delete()
+        except:
+            pass  # Prevent crashes from simultaneous deletion
 
 
 def get_user_info(user):
-    email = user.email()
-    user_info = models.UserInfo.query(ancestor=email).fetch()[0]
-    if user_info.user_class:
-        return {'user_class', user_info.user_class,
-                'groups', user_info.groups,
-                'subject_combination', user_info.subject_combination}
-    else:
-        return {'groups', user_info.groups,
-                'subject_combination', user_info.subject_combination}
+    info = models.UserInfo.query(
+            ancestor=ndb.Key('email', user.email()))[0]
+    return info
 
 
 def check_expired(task):
